@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#2196F3">
+  <meta name="description" content="Street survey navigation - cover all streets with minimal distance">
+
+  <title>EveryStreet Survey</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: #f5f5f5;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    #app {
+      height: 100%;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    .header {
+      background: #2196F3;
+      color: white;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      z-index: 1000;
+    }
+
+    .header h1 {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .header-btn {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .header-btn:hover {
+      background: rgba(255,255,255,0.3);
+    }
+
+    /* Map container */
+    #map {
+      flex: 1;
+      width: 100%;
+      z-index: 1;
+    }
+
+    /* Bottom panel */
+    .bottom-panel {
+      background: white;
+      padding: 16px;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+      z-index: 1000;
+    }
+
+    /* Status bar */
+    .status-bar {
+      display: flex;
+      justify-content: space-around;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .status-item {
+      text-align: center;
+    }
+
+    .status-value {
+      font-size: 20px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    .status-label {
+      font-size: 12px;
+      color: #666;
+    }
+
+    /* Instruction card */
+    .instruction-card {
+      background: #E3F2FD;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      display: none;
+    }
+
+    .instruction-card.active {
+      display: block;
+    }
+
+    .instruction-main {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .instruction-icon {
+      width: 48px;
+      height: 48px;
+      background: #2196F3;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 24px;
+    }
+
+    .instruction-text {
+      flex: 1;
+    }
+
+    .instruction-direction {
+      font-size: 18px;
+      font-weight: bold;
+      color: #1565C0;
+    }
+
+    .instruction-street {
+      font-size: 14px;
+      color: #666;
+    }
+
+    .instruction-distance {
+      font-size: 24px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: transform 0.1s, opacity 0.2s;
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: #2196F3;
+      color: white;
+    }
+
+    .btn-success {
+      background: #4CAF50;
+      color: white;
+    }
+
+    .btn-danger {
+      background: #f44336;
+      color: white;
+    }
+
+    .btn-secondary {
+      background: #e0e0e0;
+      color: #333;
+    }
+
+    /* Area selection overlay */
+    .area-overlay {
+      position: absolute;
+      top: 60px;
+      left: 16px;
+      right: 16px;
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      z-index: 1001;
+      display: none;
+    }
+
+    .area-overlay.active {
+      display: block;
+    }
+
+    .area-overlay h3 {
+      margin-bottom: 12px;
+      color: #333;
+    }
+
+    .area-overlay p {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 12px;
+    }
+
+    .slider-container {
+      margin: 16px 0;
+    }
+
+    .slider-container label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+
+    .slider-container input[type="range"] {
+      width: 100%;
+    }
+
+    /* Loading overlay */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255,255,255,0.95);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      z-index: 2000;
+    }
+
+    .loading-overlay.active {
+      display: flex;
+    }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid #e0e0e0;
+      border-top-color: #2196F3;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      margin-top: 16px;
+      font-size: 16px;
+      color: #666;
+    }
+
+    .loading-progress {
+      margin-top: 8px;
+      font-size: 14px;
+      color: #999;
+    }
+
+    /* Voice toggle */
+    .voice-toggle {
+      position: absolute;
+      top: 70px;
+      right: 16px;
+      background: white;
+      border: none;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      cursor: pointer;
+      z-index: 1000;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .voice-toggle.muted {
+      background: #ffebee;
+    }
+
+    /* GPS status */
+    .gps-status {
+      position: absolute;
+      top: 70px;
+      left: 16px;
+      background: white;
+      padding: 8px 12px;
+      border-radius: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      font-size: 12px;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .gps-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ccc;
+    }
+
+    .gps-dot.active {
+      background: #4CAF50;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* Progress bar */
+    .progress-bar {
+      height: 4px;
+      background: #e0e0e0;
+      border-radius: 2px;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: #4CAF50;
+      border-radius: 2px;
+      transition: width 0.3s;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header class="header">
+      <h1>EveryStreet Survey</h1>
+      <button class="header-btn" id="newSurveyBtn">New Survey</button>
+    </header>
+
+    <div id="map"></div>
+
+    <!-- GPS Status -->
+    <div class="gps-status">
+      <span class="gps-dot" id="gpsDot"></span>
+      <span id="gpsText">GPS Off</span>
+    </div>
+
+    <!-- Voice Toggle -->
+    <button class="voice-toggle" id="voiceToggle" title="Toggle voice guidance">
+      🔊
+    </button>
+
+    <!-- Area Selection Overlay -->
+    <div class="area-overlay" id="areaOverlay">
+      <h3>Select Survey Area</h3>
+      <p>Tap on the map to set center, then adjust the radius.</p>
+      <div class="slider-container">
+        <label>Radius: <span id="radiusValue">500</span>m</label>
+        <input type="range" id="radiusSlider" min="200" max="2000" value="500" step="100">
+      </div>
+      <div class="controls">
+        <button class="btn btn-secondary" id="cancelAreaBtn">Cancel</button>
+        <button class="btn btn-primary" id="confirmAreaBtn" disabled>Calculate Route</button>
+      </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+      <div class="spinner"></div>
+      <div class="loading-text" id="loadingText">Loading...</div>
+      <div class="loading-progress" id="loadingProgress"></div>
+    </div>
+
+    <!-- Bottom Panel -->
+    <div class="bottom-panel">
+      <div class="progress-bar" id="progressBar" style="display: none;">
+        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+      </div>
+
+      <div class="status-bar">
+        <div class="status-item">
+          <div class="status-value" id="distanceValue">--</div>
+          <div class="status-label">Distance</div>
+        </div>
+        <div class="status-item">
+          <div class="status-value" id="streetsValue">--</div>
+          <div class="status-label">Streets</div>
+        </div>
+        <div class="status-item">
+          <div class="status-value" id="timeValue">--</div>
+          <div class="status-label">Est. Time</div>
+        </div>
+      </div>
+
+      <div class="instruction-card" id="instructionCard">
+        <div class="instruction-main">
+          <div class="instruction-icon" id="instructionIcon">↑</div>
+          <div class="instruction-text">
+            <div class="instruction-direction" id="instructionDirection">Continue straight</div>
+            <div class="instruction-street" id="instructionStreet">Main Street</div>
+          </div>
+          <div class="instruction-distance" id="instructionDistance">100m</div>
+        </div>
+      </div>
+
+      <div class="controls" id="mainControls">
+        <button class="btn btn-primary" id="startBtn" disabled>Start Navigation</button>
+      </div>
+
+      <div class="controls" id="navControls" style="display: none;">
+        <button class="btn btn-secondary" id="pauseBtn">Pause</button>
+        <button class="btn btn-danger" id="stopBtn">Stop</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
